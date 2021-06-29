@@ -7,13 +7,10 @@ use std::io::{stdout, stdin, Read, Write};
 enum Inst {
     Inc,
     Dec,
-
     Input,
     Output,
-
     ShiftLeft,
     ShiftRight,
-
     Goto(usize)
 }
 
@@ -92,7 +89,6 @@ struct Vm {
     program: Vec<Inst>
 }
 
-#[allow(dead_code)]
 impl Vm {
 
     /// Create a virtual machine from a source program
