@@ -3,7 +3,7 @@ use std::env;
 use std::process;
 use std::io::{stdout, stdin, Read, Write};
 
-#[derive(Debug)]
+/// Instructions for the VM
 enum Inst {
     Inc,
     Dec,
