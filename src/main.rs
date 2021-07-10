@@ -4,6 +4,7 @@ use std::process;
 use std::io::{stdout, stdin, Read, Write};
 
 /// Instructions for the VM
+#[derive(Debug)]
 enum Inst {
     Inc,
     Dec,
@@ -11,7 +12,8 @@ enum Inst {
     Output,
     ShiftLeft,
     ShiftRight,
-    Goto(usize)
+    LoopStart(usize),
+    LoopEnd(usize),
 }
 
 /// Compile a BF program to its OpCode representation
@@ -43,19 +45,23 @@ fn compile(file_path: &str) -> Vec<Inst> {
             '<' => output.push(ShiftLeft),
             '>' => output.push(ShiftRight),
             '[' => {
-                loops.push(if index == 0 {0} else {index - 1});
-                continue;
+                loops.push(index);
+                output.push(LoopStart(index));
             },
             ']' => match loops.pop() {
                 Some(0) => {
                     // Loop at the start of the program is a guaranted comment
                     index = 0;
+                    loops.clear();
                     output.clear();
                     continue;
                 },
-                Some(i) => output.push(Goto(i)),
+                Some(i) => {
+                    output[i] = LoopStart(index);
+                    output.push(LoopEnd(i));
+                },
                 None => {
-                    eprintln!("{}:{}:{} Unbalanced ']'", file_path, line, column);
+                    eprintln!("{}:{}:{} Unbalanced bracket", file_path, line, column);
                     process::exit(1);
                 }
             },
@@ -71,7 +77,7 @@ fn compile(file_path: &str) -> Vec<Inst> {
     }
 
     if !loops.is_empty() {
-        eprintln!("{}:{}:{} Unbalanced '['", file_path, line, column);
+        eprintln!("{}:{}:{} Unterminated bracket", file_path, line, column);
         process::exit(1);
     }
 
@@ -134,7 +140,13 @@ impl Vm {
                     .expect("brainfuck: Failed to read from stdin");
             },
 
-            Goto(i) => {
+            LoopStart(i) => {
+                if self.memory[self.mp] == 0 {
+                    self.ip = i;
+                }
+            },
+
+            LoopEnd(i) => {
                 if self.memory[self.mp] != 0 {
                     self.ip = i;
                 }
