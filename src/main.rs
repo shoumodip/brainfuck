@@ -4,7 +4,6 @@ use std::process;
 use std::io::{stdout, stdin, Read, Write};
 
 /// Instructions for the VM
-#[derive(Debug)]
 enum Inst {
     Inc,
     Dec,
