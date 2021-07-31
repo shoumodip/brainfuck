@@ -5,14 +5,29 @@ use std::io::{stdout, stdin, Read, Write};
 
 /// Instructions for the VM
 enum Inst {
-    Inc,
-    Dec,
+    Inc(usize),
+    Dec(usize),
+    ShiftRight(usize),
+    ShiftLeft(usize),
     Input,
     Output,
-    ShiftLeft,
-    ShiftRight,
     LoopStart(usize),
     LoopEnd(usize),
+}
+
+/// Helper macro for VM instructions which take an amount.
+/// If the last instruction in the "bytecode" is of the same type as
+/// the one to be appended, then the amount of the last instruction is
+/// increased instead
+macro_rules! amount_command {
+    ($output: expr, $type: tt) => {{
+        if let Some($type(n)) = $output.last() {
+            *$output.last_mut().expect("100% rust bug not mine") = $type(n + 1);
+            continue;
+        } else {
+            $output.push($type(1));
+        }
+    }};
 }
 
 /// Compile a BF program to its OpCode representation
@@ -37,12 +52,12 @@ fn compile(file_path: &str) -> Vec<Inst> {
         column += 1;
 
         match c {
-            '+' => output.push(Inc),
-            '-' => output.push(Dec),
+            '+' => amount_command!(output, Inc),
+            '-' => amount_command!(output, Dec),
+            '>' => amount_command!(output, ShiftRight),
+            '<' => amount_command!(output, ShiftLeft),
             ',' => output.push(Input),
             '.' => output.push(Output),
-            '<' => output.push(ShiftLeft),
-            '>' => output.push(ShiftRight),
             '[' => {
                 loops.push(index);
                 output.push(LoopStart(index));
@@ -94,8 +109,25 @@ struct Vm {
     program: Vec<Inst>
 }
 
-impl Vm {
+/// Wrap around the edges in a number with customized type annotations
+macro_rules! modulo {
+    ($value: expr, $limit: expr, $type: tt) => {{
+        let limit = $limit as isize + 1;
+        let value = $value as isize;
 
+        let value = if value >= limit {
+            value % limit
+        } else if value < 0 {
+            limit - isize::abs(value) % limit
+        } else {
+            value
+        };
+
+        value as $type
+    }};
+}
+
+impl Vm {
     /// Create a virtual machine from a source program
     fn new(program: Vec<Inst>) -> Self {
         Self {
@@ -111,20 +143,11 @@ impl Vm {
         use Inst::*;
 
         match self.program[self.ip] {
-            ShiftLeft => self.mp = if self.mp == 0 {TAPE_LENGTH - 1} else {self.mp - 1},
-            ShiftRight => self.mp = if self.mp == TAPE_LENGTH - 1 {0} else {self.mp + 1},
+            Inc(amount) => self.memory[self.mp] = modulo!(self.memory[self.mp] as isize + amount as isize, u8::MAX, u8),
+            Dec(amount) => self.memory[self.mp] = modulo!(self.memory[self.mp] as isize - amount as isize, u8::MAX, u8),
 
-            Inc => self.memory[self.mp] = if self.memory[self.mp] == u8::MAX {
-                0
-            } else {
-                self.memory[self.mp] + 1
-            },
-
-            Dec => self.memory[self.mp] = if self.memory[self.mp] == 0 {
-                u8::MAX
-            } else {
-                self.memory[self.mp] - 1
-            },
+            ShiftRight(amount) => self.mp = modulo!(self.mp as isize + amount as isize, TAPE_LENGTH, usize),
+            ShiftLeft(amount) => self.mp = modulo!(self.mp as isize - amount as isize, TAPE_LENGTH, usize),
 
             Output => {
                 print!("{}", self.memory[self.mp] as char);
