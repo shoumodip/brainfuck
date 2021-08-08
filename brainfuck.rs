@@ -3,7 +3,7 @@ use std::env;
 use std::process;
 use std::io::{stdout, stdin, Read, Write};
 
-/// Instructions for the VM
+// Instructions for the VM
 enum Inst {
     Inc(usize),
     Dec(usize),
@@ -15,10 +15,10 @@ enum Inst {
     LoopEnd(usize),
 }
 
-/// Helper macro for VM instructions which take an amount.
-/// If the last instruction in the "bytecode" is of the same type as
-/// the one to be appended, then the amount of the last instruction is
-/// increased instead
+// Helper macro for VM instructions which take an amount.
+// If the last instruction in the "bytecode" is of the same type as
+// the one to be appended, then the amount of the last instruction is
+// increased instead
 macro_rules! amount_command {
     ($output: expr, $type: tt) => {{
         if let Some($type(n)) = $output.last() {
@@ -30,7 +30,7 @@ macro_rules! amount_command {
     }};
 }
 
-/// Compile a BF program to its OpCode representation
+// Compile a BF program to its OpCode representation
 fn compile(file_path: &str) -> Vec<Inst> {
     let source = match fs::read_to_string(file_path) {
         Ok(source) => source,
@@ -98,10 +98,10 @@ fn compile(file_path: &str) -> Vec<Inst> {
     output
 }
 
-/// The length of the tape
+// The length of the tape
 const TAPE_LENGTH: usize = 30000;
 
-/// The virtual machine where the program is executed
+// The virtual machine where the program is executed
 struct Vm {
     memory: [u8; TAPE_LENGTH],
     mp: usize,
@@ -109,7 +109,7 @@ struct Vm {
     program: Vec<Inst>
 }
 
-/// Wrap around the edges in a number with customized type annotations
+// Wrap around the edges in a number with customized type annotations
 macro_rules! modulo {
     ($value: expr, $limit: expr, $type: tt) => {{
         let limit = $limit as isize + 1;
@@ -128,7 +128,7 @@ macro_rules! modulo {
 }
 
 impl Vm {
-    /// Create a virtual machine from a source program
+    // Create a virtual machine from a source program
     fn new(program: Vec<Inst>) -> Self {
         Self {
             memory: [0; TAPE_LENGTH],
@@ -138,7 +138,7 @@ impl Vm {
         }
     }
 
-    /// Execute the current instruction
+    // Execute the current instruction
     fn execute(&mut self) {
         use Inst::*;
 
@@ -176,7 +176,7 @@ impl Vm {
         }
     }
 
-    /// Start the virtual machine
+    // Start the virtual machine
     fn start(&mut self) {
         while self.ip < self.program.len() {
             self.execute();

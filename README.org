@@ -2,9 +2,11 @@
 Rust implementation of [[https://en.wikipedia.org/wiki/Brainfuck][Brainfuck]]. The simplest path to neurocide.
 
 * Quick Start
+- Requires the [[https://www.rust-lang.org/][Rust Compiler]]
+
 #+begin_src console
 $ git clone https://github.com/shoumodip/brainfuck
 $ cd brainfuck
-$ cargo install --path .
-$ brainfuck examples/hello_world.brainfuck
+$ rustc brainfuck.rs
+$ ./brainfuck examples/hello_world.brainfuck
 #+end_src
