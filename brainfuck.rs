@@ -9,20 +9,25 @@ enum Inst {
     Dec(usize),
     ShiftRight(usize),
     ShiftLeft(usize),
-    Input,
-    Output,
+    Input(usize),
+    Output(usize),
     LoopStart(usize),
     LoopEnd(usize),
 }
 
-// Helper macro for VM instructions which take an amount.
+// Print a message to standard error and exit
+fn error(message: &str) {
+    eprintln!("{}", message);
+    process::exit(1);
+}
+
 // If the last instruction in the "bytecode" is of the same type as
 // the one to be appended, then the amount of the last instruction is
 // increased instead
-macro_rules! amount_command {
-    ($output: expr, $type: tt) => {{
+macro_rules! sized_inst {
+    ($output: expr, $index: expr, $type: tt) => {{
         if let Some($type(n)) = $output.last() {
-            *$output.last_mut().expect("100% rust bug not mine") = $type(n + 1);
+            $output[$index - 1] = $type(n + 1);
             continue;
         } else {
             $output.push($type(1));
@@ -30,15 +35,12 @@ macro_rules! amount_command {
     }};
 }
 
-// Compile a BF program to its OpCode representation
+// Compile a BF program to an instruction chunk for the turing machine
 fn compile(file_path: &str) -> Vec<Inst> {
-    let source = match fs::read_to_string(file_path) {
-        Ok(source) => source,
-        Err(e) => {
-            eprintln!("Error: failed to read file `{}`: {}", file_path, e);
-            process::exit(1);
-        }
-    };
+    let source = fs::read_to_string(file_path).unwrap_or_else(|_| {
+        eprintln!("error: failed to read file '{}'", file_path);
+        process::exit(1);       // Unreachable
+    });
 
     let mut output = vec![];
     let mut loops = vec![];
@@ -52,32 +54,30 @@ fn compile(file_path: &str) -> Vec<Inst> {
         column += 1;
 
         match c {
-            '+' => amount_command!(output, Inc),
-            '-' => amount_command!(output, Dec),
-            '>' => amount_command!(output, ShiftRight),
-            '<' => amount_command!(output, ShiftLeft),
-            ',' => output.push(Input),
-            '.' => output.push(Output),
+            '+' => sized_inst!(output, index, Inc),
+            '-' => sized_inst!(output, index, Dec),
+            '>' => sized_inst!(output, index, ShiftRight),
+            '<' => sized_inst!(output, index, ShiftLeft),
+            ',' => sized_inst!(output, index, Input),
+            '.' => sized_inst!(output, index, Output),
             '[' => {
-                loops.push(index);
+                loops.push((index, line, column));
                 output.push(LoopStart(index));
             },
             ']' => match loops.pop() {
-                Some(0) => {
+                Some((0, _, _)) => {
                     // Loop at the start of the program is a guaranted comment
                     index = 0;
                     loops.clear();
                     output.clear();
                     continue;
                 },
-                Some(i) => {
+                Some((i, _, _)) => {
                     output[i] = LoopStart(index);
                     output.push(LoopEnd(i));
                 },
-                None => {
-                    eprintln!("{}:{}:{} Unbalanced bracket", file_path, line, column);
-                    process::exit(1);
-                }
+                None => error(&format!("{}:{}:{} Unbalanced ']'",
+                                       file_path, line, column))
             },
             '\n' => {
                 line += 1;
@@ -90,9 +90,9 @@ fn compile(file_path: &str) -> Vec<Inst> {
         index += 1;
     }
 
-    if !loops.is_empty() {
-        eprintln!("{}:{}:{} Unterminated bracket", file_path, line, column);
-        process::exit(1);
+    if let Some((_, line, column)) = loops.last() {
+        error(&format!("{}:{}:{}: Unterminated '['",
+                       file_path, line, column));
     }
 
     output
