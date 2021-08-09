@@ -109,25 +109,18 @@ struct Vm {
     program: Vec<Inst>
 }
 
-// Wrap around the edges in a number with customized type annotations
-macro_rules! modulo {
-    ($value: expr, $limit: expr, $type: tt) => {{
-        let limit = $limit as isize + 1;
-        let value = $value as isize;
-
-        let value = if value >= limit {
-            value % limit
-        } else if value < 0 {
-            limit - isize::abs(value) % limit
-        } else {
-            value
-        };
-
-        value as $type
+// Change the value of a generic number with modulo-wrapping
+macro_rules! change {
+    ($number: expr, $amount: expr, $divisor: expr, $op: tt, $type: tt) => {{
+        let d = $divisor as isize;
+        let number = (($number as isize $op $amount as isize) % d + d) % d;
+        $number = number as $type;
     }};
 }
 
+// The custom turing machine for the generated instructions
 impl Vm {
+
     // Create a virtual machine from a source program
     fn new(program: Vec<Inst>) -> Self {
         Self {
@@ -143,23 +136,33 @@ impl Vm {
         use Inst::*;
 
         match self.program[self.ip] {
-            Inc(amount) => self.memory[self.mp] = modulo!(self.memory[self.mp] as isize + amount as isize, u8::MAX, u8),
-            Dec(amount) => self.memory[self.mp] = modulo!(self.memory[self.mp] as isize - amount as isize, u8::MAX, u8),
+            Inc(amount) => change!(self.memory[self.mp], amount, u8::MAX, +, u8),
+            Dec(amount) => change!(self.memory[self.mp], amount, u8::MAX, -, u8),
 
-            ShiftRight(amount) => self.mp = modulo!(self.mp as isize + amount as isize, TAPE_LENGTH, usize),
-            ShiftLeft(amount) => self.mp = modulo!(self.mp as isize - amount as isize, TAPE_LENGTH, usize),
+            ShiftRight(amount) => change!(self.mp, amount, TAPE_LENGTH, +, usize),
+            ShiftLeft(amount) => change!(self.mp, amount, TAPE_LENGTH, -, usize),
 
-            Output => {
-                print!("{}", self.memory[self.mp] as char);
-                stdout().flush().expect("brainfuck: Failed to flush stdout");
+            Output(amount) => {
+                for _ in 0..amount {
+                    print!("{}", self.memory[self.mp] as char);
+                }
+                stdout().flush().unwrap_or_else(|_| error("error: failed to flush stdout"));
             },
 
-            Input => {
-                self.memory[self.mp] = stdin()
-                    .bytes()
-                    .next()
-                    .expect("brainfuck: Failed to read from stdin")
-                    .expect("brainfuck: Failed to read from stdin");
+            Input(amount) => {
+                for _ in 0..amount {
+                    self.memory[self.mp] = stdin()
+                        .bytes()
+                        .next()
+                        .unwrap_or_else(|| {
+                            eprintln!("error: failed to read stdin");
+                            process::exit(1);
+                        })
+                        .unwrap_or_else(|_| {
+                            eprintln!("error: failed to read stdin");
+                            process::exit(1);
+                        })
+                }
             },
 
             LoopStart(i) => {
