@@ -39,7 +39,7 @@ macro_rules! sized_inst {
 fn compile(file_path: &str) -> Vec<Inst> {
     let source = fs::read_to_string(file_path).unwrap_or_else(|_| {
         eprintln!("error: failed to read file '{}'", file_path);
-        process::exit(1);       // Unreachable
+        process::exit(1);
     });
 
     let mut output = vec![];
@@ -191,9 +191,7 @@ impl Vm {
 fn main() {
     let mut files = 0;
 
-    for (index, file_path) in env::args().enumerate() {
-        if index == 0 { continue; }
-
+    for file_path in env::args().skip(1) {
         let mut vm = Vm::new(compile(&file_path));
         vm.start();
 
@@ -201,8 +199,7 @@ fn main() {
     }
 
     if files == 0 {
-        eprintln!("error: No input files were provided");
-        eprintln!("Usage: brainfuck [FILE-1] [...]");
-        process::exit(1);
+        error(&format!("error: no input files were provided
+usage: brainfuck [FILE]"));
     }
 }
